@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>App Préstamos</title>
+<title>Simulador Financiero</title>
 <style>
   :root {
     --azul-oscuro: #1F4E79;
@@ -272,7 +272,7 @@
 <!-- ═══════════════════════════════════════════════ LOGIN ════ -->
 <div id="pantalla-login">
   <div class="login-card">
-    <h1>App Préstamos</h1>
+    <h1>Simulador Financiero</h1>
     <p>Ingresá tus credenciales para continuar</p>
     <div class="login-error" id="login-error">Usuario o contraseña incorrectos</div>
     <div class="campo">
@@ -295,7 +295,7 @@
   <!-- SIDEBAR -->
   <aside id="sidebar">
     <div id="sidebar-logo">
-      <h1>App Préstamos</h1>
+      <h1>Simulador Financiero</h1>
       <p id="sidebar-usuario">—</p>
     </div>
     <div id="sidebar-tc">
@@ -617,30 +617,6 @@
         <div class="campo">
           <label>Tipo de tasa</label>
           <select id="p-tipo-tasa"><option>Compuesta</option><option>Simple</option></select>
-        </div>
-        <div class="campo">
-          <label>Período de gracia (días)</label>
-          <input type="number" id="p-gracia" value="0" min="0">
-        </div>
-        <div class="campo">
-          <label>Tipo de mora</label>
-          <select id="p-tipo-mora"><option>Mensual</option><option>Diario</option><option>Fijo</option></select>
-        </div>
-        <div class="campo">
-          <label>Valor mora (%)</label>
-          <input type="number" id="p-valor-mora" step="0.1" placeholder="">
-        </div>
-        <div class="campo">
-          <label>Pago anticipado</label>
-          <select id="p-pago-anticipado"><option>Descuenta interés futuro</option><option>% de rebaja</option></select>
-        </div>
-        <div class="campo">
-          <label>Imputación pago parcial</label>
-          <select id="p-imputacion"><option>Operador decide</option><option>Interés primero</option><option>Capital primero</option></select>
-        </div>
-        <div class="campo">
-          <label>¿Renovable?</label>
-          <select id="p-renovable"><option>No</option><option>Sí</option></select>
         </div>
       </div>
       <div class="campo">
@@ -1452,7 +1428,6 @@ async function abrirModalPrestamo(desdeCalc) {
     $('p-tasa').value = simulacionActual.tasa || '';
     $('p-unidad-tasa').value = simulacionActual.unidad_tasa || 'Mensual';
     $('p-tipo-tasa').value = simulacionActual.tipo_tasa || 'Compuesta';
-    $('p-gracia').value = simulacionActual.periodo_gracia || 0;
     $('p-tipo-dev').value = simulacionActual.tipo_devolucion || 'Cuotas fijas';
   } else {
     $('p-monto').value = '';
@@ -1485,12 +1460,12 @@ async function crearPrestamo() {
     tasa_interes: $('p-tasa').value,
     unidad_tasa: $('p-unidad-tasa').value,
     tipo_tasa: $('p-tipo-tasa').value,
-    periodo_gracia_dias: $('p-gracia').value,
-    tipo_mora: $('p-tipo-mora').value,
-    valor_mora: $('p-valor-mora').value,
-    pago_anticipado: $('p-pago-anticipado').value,
-    imputacion_parcial: $('p-imputacion').value,
-    renovable: $('p-renovable').value,
+    periodo_gracia_dias: 0,
+    tipo_mora: 'Mensual',
+    valor_mora: 0,
+    pago_anticipado: 'Descuenta interés futuro',
+    imputacion_parcial: 'Operador decide',
+    renovable: 'No',
     forma_entrega: $('p-forma').value,
     notas_internas: $('p-notas').value,
   };
@@ -2028,7 +2003,6 @@ async function abrirModalPrestamo(desdeCalc) {
     $('p-tasa').value = simulacionActual.tasa || '';
     $('p-unidad-tasa').value = simulacionActual.unidad_tasa || 'Mensual';
     $('p-tipo-tasa').value = simulacionActual.tipo_tasa || 'Compuesta';
-    $('p-gracia').value = simulacionActual.periodo_gracia || 0;
     $('p-tipo-dev').value = simulacionActual.tipo_devolucion || 'Cuotas fijas';
   }
   const hoy = new Date().toISOString().split('T')[0];
@@ -2053,14 +2027,12 @@ async function crearPrestamo() {
     tasa_interes: $('p-tasa').value,
     unidad_tasa: $('p-unidad-tasa').value,
     tipo_tasa: $('p-tipo-tasa').value,
-    periodo_gracia_dias: $('p-gracia').value,
-    tipo_mora: $('p-tipo-mora').value,
-    valor_mora: $('p-valor-mora').value,
-    pago_anticipado: $('p-pago-anticipado').value,
-    imputacion_parcial: $('p-imputacion').value,
-    etiquetas: $('p-etiqueta').value,
-    renovable: $('p-renovable').value,
-    proposito: $('p-proposito').value,
+    periodo_gracia_dias: 0,
+    tipo_mora: 'Mensual',
+    valor_mora: 0,
+    pago_anticipado: 'Descuenta interés futuro',
+    imputacion_parcial: 'Operador decide',
+    renovable: 'No',
     forma_entrega: $('p-forma').value,
     notas_internas: $('p-notas').value,
   };
