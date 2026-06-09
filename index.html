@@ -217,6 +217,18 @@
   #toast.error { background: var(--rojo); }
   #toast.ok { background: var(--verde); }
 
+  /* ── PAGO INLINE EN CUOTA ── */
+  .cuota-pago-inline {
+    background: var(--azul-fondo); border: 1px solid var(--azul-claro);
+    border-radius: var(--radio); padding: 10px 14px; margin-top: 6px;
+    display: none; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;
+  }
+  .cuota-pago-inline.visible { display: grid; }
+  .cuota-item-wrap { margin-bottom: 6px; }
+
+  /* ── BOTÓN GUARDADO ── */
+  .btn-guardado { background: var(--verde-fondo) !important; color: var(--verde) !important; }
+
   /* ── ESTADOS VACÍOS ── */
   .vacio { text-align: center; padding: 48px 20px; color: var(--gris-texto); }
   .vacio p { margin-top: 8px; font-size: 13px; }
@@ -1061,7 +1073,13 @@ async function verDetallePrestamo(id) {
   if (!r.ok) return;
   const p = r.prestamo;
   const res = r.resumen;
-  const pct = res.capital_original > 0 ? Math.round((res.total_pagado / res.capital_original) * 100) : 0;
+
+  // Saldo pendiente = suma de cuotas no pagadas (capital + interés)
+  const cuotasPendientes = r.cuotas.filter(c => !['Pagada','Refinanciada'].includes(c.estado));
+  const saldoConIntereses = cuotasPendientes.reduce((acc, c) => acc + (parseFloat(c.monto_total) || 0), 0);
+  const totalConIntereses = r.cuotas.reduce((acc, c) => acc + (parseFloat(c.monto_total) || 0), 0);
+  const pct = totalConIntereses > 0 ? Math.round((res.total_pagado / totalConIntereses) * 100) : 0;
+  const cuotasPagas = r.cuotas.filter(c => c.estado === 'Pagada').length;
 
   let html = `
     <div class="detalle-resumen">
@@ -1073,52 +1091,89 @@ async function verDetallePrestamo(id) {
       <div class="detalle-item">
         <div class="detalle-label">Total pagado</div>
         <div class="detalle-valor" style="color:var(--verde)">$${fmt(res.total_pagado)}</div>
-        <div style="font-size:11px;color:var(--gris-texto);margin-top:2px">${pct}% del capital</div>
+        <div style="font-size:11px;color:var(--gris-texto);margin-top:2px">${pct}% del total</div>
       </div>
       <div class="detalle-item">
         <div class="detalle-label">Saldo pendiente</div>
-        <div class="detalle-valor" style="color:var(--azul-oscuro)">$${fmt(res.saldo_pendiente)}</div>
-        <div style="font-size:11px;margin-top:2px">${badgeEstado(p.estado)}</div>
+        <div class="detalle-valor" style="color:var(--azul-oscuro)">$${fmt(saldoConIntereses)}</div>
+        <div style="font-size:11px;margin-top:2px;display:flex;gap:6px;align-items:center">
+          ${badgeEstado(p.estado)}
+          <span style="color:var(--gris-texto)">incl. intereses</span>
+        </div>
       </div>
     </div>
     <div class="tabla-wrap" style="padding:16px 20px;margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <span style="font-size:13px;font-weight:600;color:var(--azul-oscuro)">Progreso de pago</span>
-        <span style="font-size:12px;color:var(--gris-texto)">${pct}% · ${r.cuotas.filter(c=>c.estado==='Pagada').length} de ${r.cuotas.length} cuotas</span>
+        <span style="font-size:12px;color:var(--gris-texto)">${pct}% · ${cuotasPagas} de ${r.cuotas.length} cuotas</span>
       </div>
       <div class="progreso-barra"><div class="progreso-fill" style="width:${pct}%"></div></div>
     </div>`;
 
+  // Cronograma con pago inline por cuota
   if (r.cuotas.length > 0) {
     const hoy = new Date();
     html += `<div class="tabla-wrap" style="padding:16px 20px;margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="margin-bottom:12px">
         <h3 style="font-size:14px;font-weight:600;color:var(--azul-oscuro)">Cronograma de cuotas</h3>
-        <button class="btn btn-primario btn-sm" onclick="abrirModalPago('${p.id_prestamo}')">+ Registrar pago</button>
+        <p style="font-size:11px;color:var(--gris-texto);margin-top:3px">Hacé clic en "Marcar pagada" para registrar el cobro directamente en cada cuota</p>
       </div>
-      <div class="cuotas-lista">`;
+      <div class="cuotas-lista" id="cuotas-lista-${id}">`;
 
     r.cuotas.forEach(c => {
       const vence = new Date(c.fecha_vencimiento);
       const diasHasta = Math.floor((vence - hoy) / 86400000);
-      let clase = '', estadoBadge = '';
+      let clase = '', estadoBadge = '', puedeMarcar = false;
 
-      if (c.estado === 'Pagada') { clase = 'pagada'; estadoBadge = '<span class="badge badge-verde">Pagada</span>'; }
-      else if (c.estado === 'Vencida' || c.estado_propuesto === 'Vencida') { clase = 'vencida'; estadoBadge = '<span class="badge badge-rojo">Vencida</span>'; }
-      else if (c.estado === 'Refinanciada') { clase = 'refinanciada'; estadoBadge = '<span class="badge badge-violeta">Refinanciada</span>'; }
-      else if (diasHasta <= 7 && diasHasta >= 0) { clase = 'proxima'; estadoBadge = '<span class="badge badge-amarillo">Próxima</span>'; }
-      else { estadoBadge = '<span class="badge badge-gris">Pendiente</span>'; }
+      if (c.estado === 'Pagada') {
+        clase = 'pagada';
+        estadoBadge = `<span class="badge badge-verde">✓ Pagada ${c.fecha_pago_real ? fmtFecha(c.fecha_pago_real) : ''}</span>`;
+      } else if (c.estado === 'Vencida' || c.estado_propuesto === 'Vencida') {
+        clase = 'vencida'; estadoBadge = '<span class="badge badge-rojo">Vencida</span>'; puedeMarcar = true;
+      } else if (c.estado === 'Refinanciada') {
+        clase = 'refinanciada'; estadoBadge = '<span class="badge badge-violeta">Refinanciada</span>';
+      } else if (diasHasta <= 7 && diasHasta >= 0) {
+        clase = 'proxima'; estadoBadge = '<span class="badge badge-amarillo">Próxima</span>'; puedeMarcar = true;
+      } else {
+        estadoBadge = '<span class="badge badge-gris">Pendiente</span>'; puedeMarcar = true;
+      }
 
-      html += `<div class="cuota-item ${clase}">
-        <div class="cuota-num">#${c.numero_cuota}</div>
-        <div class="cuota-fecha">${fmtFecha(c.fecha_vencimiento)}</div>
-        <div class="cuota-monto">$${fmt(c.monto_total)}</div>
-        <div>${estadoBadge}</div>
-      </div>`;
+      const btnPagar = puedeMarcar
+        ? `<button class="btn btn-verde btn-sm" onclick="togglePagoInline('${c.id_cuota}')">Marcar pagada</button>`
+        : '';
+
+      html += `
+        <div class="cuota-item-wrap">
+          <div class="cuota-item ${clase}" id="cuota-${c.id_cuota}">
+            <div class="cuota-num">#${c.numero_cuota}</div>
+            <div class="cuota-fecha">${fmtFecha(c.fecha_vencimiento)}</div>
+            <div class="cuota-monto">$${fmt(c.monto_total)}<span style="font-size:10px;color:var(--gris-texto);display:block">cap $${fmt(c.monto_capital)} + int $${fmt(c.monto_interes)}</span></div>
+            <div style="display:flex;align-items:center;gap:8px">${estadoBadge}${btnPagar}</div>
+          </div>
+          <div class="cuota-pago-inline" id="pago-inline-${c.id_cuota}">
+            <div class="campo" style="margin:0">
+              <label style="font-size:11px">Fecha de pago</label>
+              <input type="date" id="pi-fecha-${c.id_cuota}" value="${new Date().toISOString().split('T')[0]}">
+            </div>
+            <div class="campo" style="margin:0">
+              <label style="font-size:11px">Método de pago</label>
+              <select id="pi-canal-${c.id_cuota}">
+                <option>Efectivo</option>
+                <option>Transferencia</option>
+                <option>Billetera digital</option>
+              </select>
+            </div>
+            <button class="btn btn-primario btn-sm" id="pi-btn-${c.id_cuota}"
+              onclick="confirmarPagoInline('${c.id_cuota}','${id}','${c.monto_total}')">
+              Confirmar
+            </button>
+          </div>
+        </div>`;
     });
     html += '</div></div>';
   }
 
+  // Historial de pagos
   if (r.pagos.length > 0) {
     html += `<div class="tabla-wrap"><div class="tabla-header"><h3>Historial de pagos</h3></div>
       <table><thead><tr><th>ID</th><th>Fecha</th><th>Monto</th><th>Moneda</th><th>Canal</th><th>Comprobante</th></tr></thead><tbody>`;
@@ -1129,6 +1184,43 @@ async function verDetallePrestamo(id) {
   }
 
   $('detalle-prestamo-content').innerHTML = html;
+}
+
+function togglePagoInline(idCuota) {
+  const div = $(`pago-inline-${idCuota}`);
+  div.classList.toggle('visible');
+}
+
+async function confirmarPagoInline(idCuota, idPrestamo, montoTotal) {
+  const btn = $(`pi-btn-${idCuota}`);
+  const textoOrig = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const body = {
+    accion: 'pago_registrar',
+    id_prestamo: idPrestamo,
+    id_cuota: idCuota,
+    monto_pagado: parseFloat(montoTotal) || 0,
+    moneda_pago: 'ARS',
+    tipo_imputacion: 'Mixto',
+    pago_parcial_total: 'Total',
+    canal_pago: $(`pi-canal-${idCuota}`).value,
+    fecha_pago: $(`pi-fecha-${idCuota}`).value,
+    comprobante: '',
+    notas: '',
+  };
+
+  const r = await apiPost(body);
+  if (r.ok) {
+    toast('Pago ' + r.id_pago + ' registrado', 'ok');
+    // Recargar el detalle para reflejar el cambio
+    await verDetallePrestamo(idPrestamo);
+  } else {
+    toast(r.error || 'Error al registrar pago', 'error');
+    btn.disabled = false;
+    btn.textContent = textoOrig;
+  }
 }
 
 // ── DEUDORES ──
@@ -1288,7 +1380,9 @@ async function cargarConfig() {
 }
 
 async function guardarConfig() {
-  setLoading('btn-guardar-cfg', true, 'Guardar parámetros');
+  const btn = $('btn-guardar-cfg');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Guardando...';
   const params = [
     ['tasa_interes_default', $('cfg-tasa').value],
     ['moneda_default', $('cfg-moneda').value],
@@ -1298,12 +1392,19 @@ async function guardarConfig() {
   for (const [parametro, valor] of params) {
     await apiPost({ accion:'config_actualizar', parametro, valor });
   }
-  setLoading('btn-guardar-cfg', false, 'Guardar parámetros');
-  toast('Parámetros guardados', 'ok');
+  btn.disabled = false;
+  btn.innerHTML = '✓ Guardado';
+  btn.classList.add('btn-guardado');
+  setTimeout(() => {
+    btn.innerHTML = 'Guardar parámetros';
+    btn.classList.remove('btn-guardado');
+  }, 3000);
 }
 
 async function guardarUmbrales() {
-  setLoading('btn-guardar-umbr', true, 'Guardar umbrales');
+  const btn = $('btn-guardar-umbr');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Guardando...';
   const params = [
     ['dias_umbral_bueno', $('cfg-umbral-bueno').value],
     ['dias_umbral_regular', $('cfg-umbral-regular').value],
@@ -1312,8 +1413,13 @@ async function guardarUmbrales() {
   for (const [parametro, valor] of params) {
     await apiPost({ accion:'config_actualizar', parametro, valor });
   }
-  setLoading('btn-guardar-umbr', false, 'Guardar umbrales');
-  toast('Umbrales guardados', 'ok');
+  btn.disabled = false;
+  btn.innerHTML = '✓ Guardado';
+  btn.classList.add('btn-guardado');
+  setTimeout(() => {
+    btn.innerHTML = 'Guardar umbrales';
+    btn.classList.remove('btn-guardado');
+  }, 3000);
 }
 
 // ── MODALES ──
