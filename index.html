@@ -515,8 +515,6 @@
             <div class="campo-grid cols-2">
               <div class="campo"><label>Tasa interés default (%)</label><input type="number" id="cfg-tasa" step="0.1"></div>
               <div class="campo"><label>Moneda default</label><select id="cfg-moneda"><option>ARS</option><option>USD</option></select></div>
-              <div class="campo"><label>Tipo mora default</label><select id="cfg-mora"><option>Mensual</option><option>Diario</option><option>Fijo</option></select></div>
-              <div class="campo"><label>Valor mora default (%)</label><input type="number" id="cfg-valor-mora" step="0.1"></div>
             </div>
             <button class="btn btn-primario btn-sm" id="btn-guardar-cfg" onclick="guardarConfig()">Guardar parámetros</button>
           </div>
@@ -856,12 +854,23 @@ function getRawMonto(inputId) {
 // ── LOGIN / SESIÓN ──
 async function iniciarApp() {
   if (TOKEN && USER_NAME) {
-    $('pantalla-login').style.display = 'none';
-    $('app').style.display = 'flex';
-    $('sidebar-usuario').textContent = USER_NAME;
-    $('topbar-rol').textContent = USER_ROL || '';
-    irA('calculadora');
-    cargarTC();
+    // Verificar que el token sigue válido en el servidor
+    const check = await api('reporte_dashboard');
+    if (check.ok || (check.error && !check.error.includes('Sesión'))) {
+      // Token válido o error de datos pero no de sesión
+      $('pantalla-login').style.display = 'none';
+      $('app').style.display = 'flex';
+      $('sidebar-usuario').textContent = USER_NAME;
+      $('topbar-rol').textContent = USER_ROL || '';
+      irA('calculadora');
+      cargarTC();
+    } else {
+      // Token vencido — limpiar y mostrar login
+      localStorage.removeItem('app_token');
+      localStorage.removeItem('app_rol');
+      localStorage.removeItem('app_user');
+      TOKEN = null;
+    }
   }
 }
 
@@ -1003,8 +1012,24 @@ async function cargarDashboard() {
   $('d-mora').textContent = '...';
   $('d-cobros').textContent = '...';
   $('d-activos').textContent = '...';
+  $('d-movimientos').innerHTML = '<div class="vacio"><p>Cargando...</p></div>';
+
   const r = await api('reporte_dashboard');
-  if (!r.ok) return;
+
+  if (!r.ok) {
+    if (r.error && r.error.includes('Sesión')) {
+      toast('Sesión expirada, volvé a iniciar sesión', 'error');
+      cerrarSesion();
+    } else {
+      $('d-capital').textContent = '—';
+      $('d-mora').textContent = '—';
+      $('d-cobros').textContent = '—';
+      $('d-activos').textContent = '—';
+      $('d-movimientos').innerHTML = `<div class="vacio"><p>Error al cargar: ${r.error || 'Sin conexión'}</p></div>`;
+    }
+    return;
+  }
+
   const d = r.dashboard;
   $('d-capital').textContent = '$' + fmt(d.capital_activo);
   $('d-mora').textContent = d.en_mora;
@@ -1364,8 +1389,6 @@ async function cargarConfig() {
   $('cfg-tc-fecha').textContent = c.ultima_actualizacion_tc ? 'Actualizado: '+fmtFecha(c.ultima_actualizacion_tc) : '';
   $('cfg-tasa').value = c.tasa_interes_default || '';
   if ($('cfg-moneda')) $('cfg-moneda').value = c.moneda_default || 'ARS';
-  if ($('cfg-mora')) $('cfg-mora').value = c.tipo_mora_default || 'Mensual';
-  $('cfg-valor-mora').value = c.valor_mora_default || '';
   $('cfg-umbral-bueno').value = c.dias_umbral_bueno || 7;
   $('cfg-umbral-regular').value = c.dias_umbral_regular || 30;
   $('cfg-umbral-moroso').value = c.dias_umbral_moroso || 31;
@@ -1379,8 +1402,6 @@ async function guardarConfig() {
     const params = [
       ['tasa_interes_default', $('cfg-tasa').value],
       ['moneda_default', $('cfg-moneda').value],
-      ['tipo_mora_default', $('cfg-mora').value],
-      ['valor_mora_default', $('cfg-valor-mora').value],
     ];
     for (const [parametro, valor] of params) {
       await apiPost({ accion:'config_actualizar', parametro, valor });
