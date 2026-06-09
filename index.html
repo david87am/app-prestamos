@@ -344,7 +344,7 @@
             <div class="campo-grid cols-2">
               <div class="campo">
                 <label>Monto</label>
-                <input type="number" id="calc-monto" placeholder="100000" oninput="limpiarCalc()">
+                <input type="text" id="calc-monto" placeholder="" oninput="formatearMontoCalc(this);limpiarCalc()">
               </div>
               <div class="campo">
                 <label>Moneda</label>
@@ -354,7 +354,7 @@
                 <label>Tipo de devolución</label>
                 <select id="calc-tipo" onchange="toggleCuotas()">
                   <option>Cuotas fijas</option>
-                  <option>Cuota única</option>
+                  <option value="Cuota única">Un solo pago</option>
                 </select>
               </div>
               <div class="campo" id="campo-cuotas">
@@ -378,7 +378,7 @@
                 <input type="number" id="calc-gracia" placeholder="0" value="0" min="0">
               </div>
             </div>
-            <button class="btn btn-primario" onclick="simular()">Calcular</button>
+            <button class="btn btn-primario" id="btn-calcular" onclick="simular()">Calcular</button>
             <div class="calc-resultado" id="calc-resultado">
               <h4>Resultado de la simulación</h4>
               <div class="calc-grid">
@@ -495,7 +495,7 @@
               <div class="campo"><label>TC Blue</label><input type="text" id="cfg-blue" readonly style="background:var(--gris-fondo)"></div>
               <div class="campo"><label>TC MEP</label><input type="text" id="cfg-mep" readonly style="background:var(--gris-fondo)"></div>
             </div>
-            <button class="btn btn-primario btn-sm" onclick="actualizarTC()">Actualizar TC desde API</button>
+            <button class="btn btn-primario btn-sm" id="btn-act-tc" onclick="actualizarTC()">Actualizar TC desde API</button>
             <span id="cfg-tc-fecha" style="font-size:11px;color:var(--gris-texto);margin-left:10px"></span>
           </div>
           <div class="tabla-wrap" style="padding:24px;margin-bottom:20px">
@@ -506,7 +506,7 @@
               <div class="campo"><label>Tipo mora default</label><select id="cfg-mora"><option>Mensual</option><option>Diario</option><option>Fijo</option></select></div>
               <div class="campo"><label>Valor mora default (%)</label><input type="number" id="cfg-valor-mora" step="0.1"></div>
             </div>
-            <button class="btn btn-primario btn-sm" onclick="guardarConfig()">Guardar parámetros</button>
+            <button class="btn btn-primario btn-sm" id="btn-guardar-cfg" onclick="guardarConfig()">Guardar parámetros</button>
           </div>
           <div class="tabla-wrap" style="padding:24px">
             <h3 style="color:var(--azul-oscuro);font-size:15px;margin-bottom:18px">Umbrales de calificación (días de retraso)</h3>
@@ -515,7 +515,7 @@
               <div class="campo"><label>→ Regular (máx. días)</label><input type="number" id="cfg-umbral-regular"></div>
               <div class="campo"><label>→ Moroso (desde días)</label><input type="number" id="cfg-umbral-moroso"></div>
             </div>
-            <button class="btn btn-primario btn-sm" onclick="guardarUmbrales()">Guardar umbrales</button>
+            <button class="btn btn-primario btn-sm" id="btn-guardar-umbr" onclick="guardarUmbrales()">Guardar umbrales</button>
           </div>
         </div>
       </div>
@@ -534,14 +534,45 @@
       <button class="btn-cerrar" onclick="cerrarModal('modal-prestamo')">×</button>
     </div>
     <div class="modal-body">
+      <!-- Deudor: buscar existente o crear nuevo -->
+      <div class="campo" style="margin-bottom:18px">
+        <label>Deudor</label>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+          <input type="text" id="p-deudor-buscar" placeholder="Escribí el nombre para buscar..." oninput="filtrarDeudores()" autocomplete="off" style="flex:1">
+          <button class="btn btn-secundario btn-sm" onclick="toggleNuevoDeudorInline()" id="btn-toggle-deudor">+ Nuevo</button>
+        </div>
+        <div id="p-deudor-lista" style="border:1px solid var(--gris-borde);border-radius:var(--radio);max-height:140px;overflow-y:auto;display:none;background:var(--blanco)"></div>
+        <div id="p-deudor-seleccionado" style="display:none;background:var(--azul-fondo);border:1px solid var(--azul-claro);border-radius:var(--radio);padding:8px 12px;font-size:13px;display:flex;justify-content:space-between;align-items:center">
+          <span id="p-deudor-nombre-sel"></span>
+          <button class="btn btn-secundario btn-sm" onclick="deseleccionarDeudor()">Cambiar</button>
+        </div>
+        <input type="hidden" id="p-deudor-id">
+        <!-- Formulario nuevo deudor inline -->
+        <div id="p-nuevo-deudor-form" style="display:none;border:1px solid var(--azul-claro);border-radius:var(--radio);padding:14px;margin-top:8px;background:var(--azul-fondo)">
+          <p style="font-size:12px;font-weight:600;color:var(--azul-oscuro);margin-bottom:10px">Nuevo deudor</p>
+          <div class="campo-grid cols-2">
+            <div class="campo"><label>Nombre completo *</label><input type="text" id="nd-nombre"></div>
+            <div class="campo"><label>DNI / CUIT</label><input type="text" id="nd-dni"></div>
+            <div class="campo"><label>Teléfono</label><input type="text" id="nd-tel"></div>
+            <div class="campo"><label>CBU / Cuenta</label><input type="text" id="nd-cbu"></div>
+          </div>
+          <div class="campo"><label>Referente / Cómo llegó</label><input type="text" id="nd-referente" placeholder="Nombre o canal"></div>
+          <button class="btn btn-primario btn-sm" onclick="crearDeudorInline()">Crear y seleccionar</button>
+        </div>
+      </div>
+
       <div class="campo-grid cols-2">
         <div class="campo">
-          <label>Deudor</label>
-          <select id="p-deudor"></select>
+          <label>Fecha de acreditación</label>
+          <input type="date" id="p-fecha-desembolso">
+        </div>
+        <div class="campo">
+          <label>Fecha primera cuota</label>
+          <input type="date" id="p-fecha-cuota">
         </div>
         <div class="campo">
           <label>Monto capital</label>
-          <input type="number" id="p-monto" placeholder="100000">
+          <input type="text" id="p-monto" placeholder="" oninput="formatearMonto(this)">
         </div>
         <div class="campo">
           <label>Moneda</label>
@@ -552,17 +583,11 @@
           <select id="p-forma"><option>Efectivo</option><option>Transferencia</option><option>Otro</option></select>
         </div>
         <div class="campo">
-          <label>Fecha de desembolso</label>
-          <input type="date" id="p-fecha-desembolso">
-        </div>
-        <div class="campo">
-          <label>Fecha primera cuota</label>
-          <input type="date" id="p-fecha-cuota">
-        </div>
-        <div class="campo">
           <label>Tipo de devolución</label>
           <select id="p-tipo-dev" onchange="toggleCamposCuotas()">
-            <option>Cuotas fijas</option><option>Cuota única</option><option>Libre</option>
+            <option>Cuotas fijas</option>
+            <option value="Cuota única">Un solo pago</option>
+            <option>Libre</option>
           </select>
         </div>
         <div class="campo" id="p-campo-cuotas">
@@ -571,7 +596,7 @@
         </div>
         <div class="campo">
           <label>Tasa de interés (%)</label>
-          <input type="number" id="p-tasa" step="0.1" placeholder="5">
+          <input type="number" id="p-tasa" step="0.1" placeholder="">
         </div>
         <div class="campo">
           <label>Unidad de tasa</label>
@@ -591,7 +616,7 @@
         </div>
         <div class="campo">
           <label>Valor mora (%)</label>
-          <input type="number" id="p-valor-mora" step="0.1" placeholder="2">
+          <input type="number" id="p-valor-mora" step="0.1" placeholder="">
         </div>
         <div class="campo">
           <label>Pago anticipado</label>
@@ -602,17 +627,9 @@
           <select id="p-imputacion"><option>Operador decide</option><option>Interés primero</option><option>Capital primero</option></select>
         </div>
         <div class="campo">
-          <label>Etiqueta</label>
-          <select id="p-etiqueta"><option value="">Sin etiqueta</option><option>Familiar</option><option>Negocio</option><option>Consumo</option><option>Emergencia</option><option>Urgente</option><option>Renovación</option><option>VIP</option></select>
-        </div>
-        <div class="campo">
           <label>¿Renovable?</label>
           <select id="p-renovable"><option>No</option><option>Sí</option></select>
         </div>
-      </div>
-      <div class="campo">
-        <label>Propósito</label>
-        <input type="text" id="p-proposito" placeholder="Para qué se usa el dinero">
       </div>
       <div class="campo">
         <label>Notas internas</label>
@@ -621,7 +638,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-prestamo')">Cancelar</button>
-      <button class="btn btn-primario" onclick="crearPrestamo()">Crear préstamo</button>
+      <button class="btn btn-primario" id="btn-crear-prestamo" onclick="crearPrestamo()">Crear préstamo</button>
     </div>
   </div>
 </div>
@@ -688,7 +705,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-deudor')">Cancelar</button>
-      <button class="btn btn-primario" onclick="crearDeudor()">Guardar deudor</button>
+      <button class="btn btn-primario" id="btn-crear-deudor" onclick="crearDeudor()">Guardar deudor</button>
     </div>
   </div>
 </div>
@@ -712,7 +729,7 @@
         </div>
         <div class="campo">
           <label>Monto pagado</label>
-          <input type="number" id="pago-monto" placeholder="50000">
+          <input type="text" id="pago-monto" placeholder="" oninput="formatearMonto(this)">
         </div>
         <div class="campo">
           <label>Moneda del pago</label>
@@ -746,7 +763,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secundario" onclick="cerrarModal('modal-pago')">Cancelar</button>
-      <button class="btn btn-primario" onclick="registrarPago()">Registrar pago</button>
+      <button class="btn btn-primario" id="btn-registrar-pago" onclick="registrarPago()">Registrar pago</button>
     </div>
   </div>
 </div>
@@ -754,9 +771,720 @@
 <!-- ═════════════════════════════════ JAVASCRIPT ══════════════ -->
 <script>
 const API = 'https://script.google.com/macros/s/AKfycbyEFm6BfAUGlw1YRbRq9_usqY-rhh-fGrNbr9IhTvor9GbC4WiaO--GnIBZ5iUjMT3L/exec';
-let TOKEN = null;
-let USER_ROL = null;
+let TOKEN = localStorage.getItem('app_token');
+let USER_ROL = localStorage.getItem('app_rol');
+let USER_NAME = localStorage.getItem('app_user');
 let simulacionActual = null;
+let deudoresCache = [];
+
+// ── UTILIDADES ──
+const $ = id => document.getElementById(id);
+const fmt = n => isNaN(n) ? '—' : Number(n).toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:0});
+const fmtDec = n => isNaN(n) ? '—' : Number(n).toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtFecha = s => s ? s.split('T')[0].split('-').reverse().join('/') : '—';
+
+function toast(msg, tipo = '') {
+  const t = $('toast');
+  t.textContent = msg; t.className = 'show ' + tipo;
+  setTimeout(() => t.className = '', 2800);
+}
+
+function setLoading(btnId, loading, textoOriginal) {
+  const btn = $(btnId);
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.innerHTML = loading ? '<span class="spinner"></span> Espera...' : textoOriginal;
+}
+
+function setLoadingNav(loading) {
+  const overlay = $('nav-loading');
+  if (overlay) overlay.style.display = loading ? 'flex' : 'none';
+}
+
+async function api(accion, params = {}) {
+  const url = new URL(API);
+  url.searchParams.set('accion', accion);
+  if (TOKEN) url.searchParams.set('token', TOKEN);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
+  const r = await fetch(url.toString());
+  return r.json();
+}
+
+async function apiPost(body) {
+  if (TOKEN) body.token = TOKEN;
+  const r = await fetch(API, { method:'POST', body: JSON.stringify(body) });
+  return r.json();
+}
+
+function badgeEstado(estado) {
+  const mapa = {
+    'Vigente': 'badge-azul', 'Al día': 'badge-verde', 'En mora': 'badge-rojo',
+    'Cancelado': 'badge-gris', 'Condonado': 'badge-amarillo', 'Refinanciado': 'badge-violeta'
+  };
+  return `<span class="badge ${mapa[estado] || 'badge-gris'}">${estado}</span>`;
+}
+
+function badgeCalif(c) {
+  const mapa = { 'Excelente':'badge-verde','Bueno':'badge-azul','Regular':'badge-amarillo','Moroso':'badge-rojo','Sin historial':'badge-gris' };
+  return `<span class="badge ${mapa[c] || 'badge-gris'}">${c}</span>`;
+}
+
+// ── FORMATEO DE MONTOS ──
+function formatearMonto(input) {
+  let v = input.value.replace(/\D/g, '');
+  if (!v) { input.value = ''; return; }
+  input.value = '$' + Number(v).toLocaleString('es-AR');
+  input.dataset.raw = v;
+}
+
+function formatearMontoCalc(input) {
+  let v = input.value.replace(/\D/g, '');
+  if (!v) { input.value = ''; return; }
+  input.value = '$' + Number(v).toLocaleString('es-AR');
+  input.dataset.raw = v;
+}
+
+function getRawMonto(inputId) {
+  const el = $(inputId);
+  return parseFloat(el.dataset.raw || el.value.replace(/\D/g,'')) || 0;
+}
+
+// ── LOGIN / SESIÓN ──
+async function iniciarApp() {
+  if (TOKEN && USER_NAME) {
+    $('pantalla-login').style.display = 'none';
+    $('app').style.display = 'flex';
+    $('sidebar-usuario').textContent = USER_NAME;
+    $('topbar-rol').textContent = USER_ROL || '';
+    irA('calculadora');
+    cargarTC();
+  }
+}
+
+async function hacerLogin() {
+  const usuario = $('login-usuario').value.trim();
+  const pass = $('login-pass').value.trim();
+  if (!usuario || !pass) return;
+  setLoading('btn-login', true, 'Ingresar');
+
+  const r = await apiPost({ accion:'login', usuario, contrasena: pass });
+
+  if (r.ok) {
+    TOKEN = r.token;
+    USER_ROL = r.rol;
+    USER_NAME = r.usuario;
+    localStorage.setItem('app_token', TOKEN);
+    localStorage.setItem('app_rol', USER_ROL);
+    localStorage.setItem('app_user', USER_NAME);
+    $('login-error').style.display = 'none';
+    $('pantalla-login').style.display = 'none';
+    $('app').style.display = 'flex';
+    $('sidebar-usuario').textContent = USER_NAME;
+    $('topbar-rol').textContent = USER_ROL;
+    irA('calculadora');
+    cargarTC();
+  } else {
+    $('login-error').style.display = 'block';
+    setLoading('btn-login', false, 'Ingresar');
+  }
+}
+
+$('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') hacerLogin(); });
+
+function cerrarSesion() {
+  TOKEN = null; USER_ROL = null; USER_NAME = null;
+  localStorage.removeItem('app_token');
+  localStorage.removeItem('app_rol');
+  localStorage.removeItem('app_user');
+  $('app').style.display = 'none';
+  $('pantalla-login').style.display = 'flex';
+  $('login-usuario').value = '';
+  $('login-pass').value = '';
+}
+
+// ── NAVEGACIÓN ──
+function irA(vista) {
+  document.querySelectorAll('.vista').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('activo'));
+  const titulos = {
+    calculadora:'Simulador', dashboard:'Dashboard', prestamos:'Préstamos',
+    'detalle-prestamo':'Detalle de préstamo', deudores:'Deudores',
+    pagos:'Pagos', reportes:'Reportes', configuracion:'Configuración'
+  };
+  const el = $('vista-' + vista);
+  if (el) el.style.display = 'block';
+  $('topbar-titulo').textContent = titulos[vista] || vista;
+  const nav = $('nav-' + vista);
+  if (nav) nav.classList.add('activo');
+
+  if (vista === 'dashboard')      cargarDashboard();
+  if (vista === 'prestamos')      cargarPrestamos();
+  if (vista === 'deudores')       cargarDeudores();
+  if (vista === 'pagos')          cargarPagos();
+  if (vista === 'reportes')       cargarReportes();
+  if (vista === 'configuracion')  cargarConfig();
+}
+
+// ── TC ──
+async function cargarTC() {
+  const r = await api('tc_actualizar');
+  if (r.ok) {
+    $('tc-blue-sidebar').textContent = '$' + fmt(r.tc.blue);
+    $('tc-oficial-sidebar').textContent = '$' + fmt(r.tc.oficial);
+  }
+}
+
+async function actualizarTC() {
+  setLoading('btn-act-tc', true, 'Actualizar TC desde API');
+  const r = await api('tc_actualizar');
+  setLoading('btn-act-tc', false, 'Actualizar TC desde API');
+  if (r.ok) {
+    toast('TC actualizado correctamente', 'ok');
+    cargarConfig();
+    $('tc-blue-sidebar').textContent = '$' + fmt(r.tc.blue);
+    $('tc-oficial-sidebar').textContent = '$' + fmt(r.tc.oficial);
+  } else toast('Error al actualizar TC', 'error');
+}
+
+// ── CALCULADORA ──
+function toggleCuotas() {
+  $('campo-cuotas').style.display = $('calc-tipo').value === 'Cuota única' ? 'none' : 'block';
+}
+
+function limpiarCalc() { $('calc-resultado').style.display = 'none'; }
+
+async function simular() {
+  const monto = getRawMonto('calc-monto');
+  const tasa = parseFloat($('calc-tasa').value);
+  if (!monto || !tasa) return toast('Completá monto y tasa', 'error');
+
+  setLoading('btn-calcular', true, 'Calcular');
+
+  const body = {
+    accion: 'simular', monto, moneda: $('calc-moneda').value,
+    tipo_devolucion: $('calc-tipo').value,
+    cantidad_cuotas: parseInt($('calc-cuotas').value) || 1,
+    tasa, unidad_tasa: $('calc-unidad').value,
+    tipo_tasa: $('calc-tipo-tasa').value,
+    periodo_gracia: parseInt($('calc-gracia').value) || 0,
+  };
+
+  const r = await apiPost(body);
+  setLoading('btn-calcular', false, 'Calcular');
+  if (!r.ok) return toast('Error en simulación', 'error');
+
+  simulacionActual = { ...body, ...r.simulacion };
+  const s = r.simulacion;
+  const moneda = body.moneda === 'USD' ? 'USD ' : '$';
+
+  $('r-total').textContent = moneda + fmtDec(s.total_pagar);
+  $('r-interes').textContent = moneda + fmtDec(s.total_interes);
+  $('r-cuota').textContent = s.cuota_mensual > 0 ? moneda + fmtDec(s.cuota_mensual) : '—';
+  $('r-tasas').textContent = s.tna.toFixed(2) + '% / ' + s.tea.toFixed(2) + '%';
+
+  if (s.cronograma.length > 0 && s.cronograma.length <= 24) {
+    let html = '<div class="cronograma-mini"><table><thead><tr><th>#</th><th>Capital</th><th>Interés</th><th>Total</th></tr></thead><tbody>';
+    s.cronograma.forEach(c => {
+      html += `<tr><td>${c.cuota}</td><td>${moneda}${fmtDec(c.capital)}</td><td>${moneda}${fmtDec(c.interes)}</td><td><strong>${moneda}${fmtDec(c.total)}</strong></td></tr>`;
+    });
+    html += '</tbody></table></div>';
+    $('cronograma-mini').innerHTML = html;
+  }
+  $('calc-resultado').style.display = 'block';
+}
+
+// ── DASHBOARD ──
+async function cargarDashboard() {
+  $('d-capital').textContent = '...';
+  $('d-mora').textContent = '...';
+  $('d-cobros').textContent = '...';
+  $('d-activos').textContent = '...';
+  const r = await api('reporte_dashboard');
+  if (!r.ok) return;
+  const d = r.dashboard;
+  $('d-capital').textContent = '$' + fmt(d.capital_activo);
+  $('d-mora').textContent = d.en_mora;
+  $('d-cobros').textContent = '$' + fmt(d.cobros_mes);
+  $('d-activos').textContent = d.prestamos_activos;
+  $('d-monedas').textContent = `ARS: ${d.distribucion_moneda.ARS} · USD: ${d.distribucion_moneda.USD}`;
+  const hoy = new Date();
+  $('d-cobros-sub').textContent = hoy.toLocaleString('es-AR', {month:'long', year:'numeric'});
+
+  const rPag = await api('pagos_listar');
+  if (rPag.ok && rPag.pagos.length > 0) {
+    const ultimos = rPag.pagos.slice(-5).reverse();
+    let html = '<table><thead><tr><th>ID</th><th>Préstamo</th><th>Fecha</th><th>Monto</th><th>Canal</th></tr></thead><tbody>';
+    ultimos.forEach(p => {
+      html += `<tr><td>${p.id_pago}</td><td>${p.id_prestamo}</td><td>${fmtFecha(p.fecha_pago)}</td><td>$${fmt(p.monto_pagado)}</td><td>${p.canal_pago}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    $('d-movimientos').innerHTML = html;
+  } else {
+    $('d-movimientos').innerHTML = '<div class="vacio"><p>Sin movimientos aún. Registrá el primer pago.</p></div>';
+  }
+}
+
+// ── PRÉSTAMOS ──
+async function cargarPrestamos() {
+  $('tabla-prestamos').innerHTML = '<div class="vacio"><p>Cargando préstamos...</p></div>';
+  const estado = $('filtro-estado').value;
+  const params = estado ? { estado } : {};
+  const r = await api('prestamos_listar', params);
+  if (!r.ok) return;
+
+  if (!r.prestamos.length) {
+    $('tabla-prestamos').innerHTML = '<div class="vacio"><p>No hay préstamos. Usá la calculadora para crear el primero.</p></div>';
+    return;
+  }
+
+  let html = '<table><thead><tr><th>ID</th><th>Deudor</th><th>Capital</th><th>Moneda</th><th>Tipo</th><th>Estado</th><th>Vencimiento</th><th></th></tr></thead><tbody>';
+  r.prestamos.forEach(p => {
+    html += `<tr>
+      <td><strong>${p.id_prestamo}</strong></td>
+      <td>${p.id_deudor}</td>
+      <td>$${fmt(p.monto_capital)}</td>
+      <td><span class="badge badge-${p.moneda === 'USD' ? 'verde' : 'azul'}">${p.moneda}</span></td>
+      <td>${p.tipo_devolucion}</td>
+      <td>${badgeEstado(p.estado)}</td>
+      <td>${fmtFecha(p.fecha_vencimiento)}</td>
+      <td><button class="btn btn-secundario btn-sm" onclick="verDetallePrestamo('${p.id_prestamo}')">Ver</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  $('tabla-prestamos').innerHTML = html;
+}
+
+async function verDetallePrestamo(id) {
+  irA('detalle-prestamo');
+  $('detalle-prestamo-content').innerHTML = '<div class="vacio"><p>Cargando detalle...</p></div>';
+  const r = await api('prestamo_obtener', { id });
+  if (!r.ok) return;
+  const p = r.prestamo;
+  const res = r.resumen;
+  const pct = res.capital_original > 0 ? Math.round((res.total_pagado / res.capital_original) * 100) : 0;
+
+  let html = `
+    <div class="detalle-resumen">
+      <div class="detalle-item">
+        <div class="detalle-label">Capital original</div>
+        <div class="detalle-valor">$${fmt(res.capital_original)}</div>
+        <div style="font-size:11px;color:var(--gris-texto);margin-top:2px">${p.moneda} · ${p.tipo_devolucion}</div>
+      </div>
+      <div class="detalle-item">
+        <div class="detalle-label">Total pagado</div>
+        <div class="detalle-valor" style="color:var(--verde)">$${fmt(res.total_pagado)}</div>
+        <div style="font-size:11px;color:var(--gris-texto);margin-top:2px">${pct}% del capital</div>
+      </div>
+      <div class="detalle-item">
+        <div class="detalle-label">Saldo pendiente</div>
+        <div class="detalle-valor" style="color:var(--azul-oscuro)">$${fmt(res.saldo_pendiente)}</div>
+        <div style="font-size:11px;margin-top:2px">${badgeEstado(p.estado)}</div>
+      </div>
+    </div>
+    <div class="tabla-wrap" style="padding:16px 20px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:13px;font-weight:600;color:var(--azul-oscuro)">Progreso de pago</span>
+        <span style="font-size:12px;color:var(--gris-texto)">${pct}% · ${r.cuotas.filter(c=>c.estado==='Pagada').length} de ${r.cuotas.length} cuotas</span>
+      </div>
+      <div class="progreso-barra"><div class="progreso-fill" style="width:${pct}%"></div></div>
+    </div>`;
+
+  if (r.cuotas.length > 0) {
+    const hoy = new Date();
+    html += `<div class="tabla-wrap" style="padding:16px 20px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="font-size:14px;font-weight:600;color:var(--azul-oscuro)">Cronograma de cuotas</h3>
+        <button class="btn btn-primario btn-sm" onclick="abrirModalPago('${p.id_prestamo}')">+ Registrar pago</button>
+      </div>
+      <div class="cuotas-lista">`;
+
+    r.cuotas.forEach(c => {
+      const vence = new Date(c.fecha_vencimiento);
+      const diasHasta = Math.floor((vence - hoy) / 86400000);
+      let clase = '', estadoBadge = '';
+
+      if (c.estado === 'Pagada') { clase = 'pagada'; estadoBadge = '<span class="badge badge-verde">Pagada</span>'; }
+      else if (c.estado === 'Vencida' || c.estado_propuesto === 'Vencida') { clase = 'vencida'; estadoBadge = '<span class="badge badge-rojo">Vencida</span>'; }
+      else if (c.estado === 'Refinanciada') { clase = 'refinanciada'; estadoBadge = '<span class="badge badge-violeta">Refinanciada</span>'; }
+      else if (diasHasta <= 7 && diasHasta >= 0) { clase = 'proxima'; estadoBadge = '<span class="badge badge-amarillo">Próxima</span>'; }
+      else { estadoBadge = '<span class="badge badge-gris">Pendiente</span>'; }
+
+      html += `<div class="cuota-item ${clase}">
+        <div class="cuota-num">#${c.numero_cuota}</div>
+        <div class="cuota-fecha">${fmtFecha(c.fecha_vencimiento)}</div>
+        <div class="cuota-monto">$${fmt(c.monto_total)}</div>
+        <div>${estadoBadge}</div>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
+
+  if (r.pagos.length > 0) {
+    html += `<div class="tabla-wrap"><div class="tabla-header"><h3>Historial de pagos</h3></div>
+      <table><thead><tr><th>ID</th><th>Fecha</th><th>Monto</th><th>Moneda</th><th>Canal</th><th>Comprobante</th></tr></thead><tbody>`;
+    r.pagos.forEach(pg => {
+      html += `<tr><td>${pg.id_pago}</td><td>${fmtFecha(pg.fecha_pago)}</td><td>$${fmt(pg.monto_pagado)}</td><td>${pg.moneda_pago}</td><td>${pg.canal_pago}</td><td>${pg.comprobante || '—'}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+
+  $('detalle-prestamo-content').innerHTML = html;
+}
+
+// ── DEUDORES ──
+async function cargarDeudores() {
+  $('tabla-deudores').innerHTML = '<div class="vacio"><p>Cargando deudores...</p></div>';
+  const r = await api('deudores_listar');
+  deudoresCache = r.ok ? r.deudores : [];
+  if (!r.ok) return;
+  if (!r.deudores.length) {
+    $('tabla-deudores').innerHTML = '<div class="vacio"><p>Sin deudores registrados todavía.</p></div>';
+    return;
+  }
+  let html = '<table><thead><tr><th>ID</th><th>Nombre</th><th>DNI/CUIT</th><th>Teléfono</th><th>Calificación</th><th>Etiqueta</th><th>Garante</th></tr></thead><tbody>';
+  r.deudores.forEach(d => {
+    html += `<tr>
+      <td>${d.id_deudor}</td>
+      <td><strong>${d.nombre_completo}</strong></td>
+      <td>${d.dni_cuit}</td>
+      <td>${d.telefono}</td>
+      <td>${badgeCalif(d.calificacion)}</td>
+      <td>${d.etiquetas ? `<span class="badge badge-gris">${d.etiquetas}</span>` : ''}</td>
+      <td>${d.tiene_garante === 'Sí' ? '<span class="badge badge-azul">Sí</span>' : '—'}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  $('tabla-deudores').innerHTML = html;
+}
+
+// ── BUSCADOR DEUDOR EN MODAL PRÉSTAMO ──
+function filtrarDeudores() {
+  const q = $('p-deudor-buscar').value.toLowerCase().trim();
+  const lista = $('p-deudor-lista');
+  if (!q) { lista.style.display = 'none'; return; }
+  const filtrados = deudoresCache.filter(d => d.nombre_completo.toLowerCase().includes(q));
+  if (!filtrados.length) { lista.style.display = 'none'; return; }
+  lista.innerHTML = filtrados.map(d =>
+    `<div onclick="seleccionarDeudor('${d.id_deudor}','${d.nombre_completo}')"
+      style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--gris-borde)"
+      onmouseover="this.style.background='var(--azul-fondo)'"
+      onmouseout="this.style.background=''"
+    >${d.nombre_completo} <span style="color:var(--gris-texto);font-size:11px">· ${d.dni_cuit||''}</span></div>`
+  ).join('');
+  lista.style.display = 'block';
+}
+
+function seleccionarDeudor(id, nombre) {
+  $('p-deudor-id').value = id;
+  $('p-deudor-nombre-sel').textContent = nombre;
+  $('p-deudor-seleccionado').style.display = 'flex';
+  $('p-deudor-buscar').style.display = 'none';
+  $('p-deudor-lista').style.display = 'none';
+  $('p-nuevo-deudor-form').style.display = 'none';
+  $('btn-toggle-deudor').style.display = 'none';
+}
+
+function deseleccionarDeudor() {
+  $('p-deudor-id').value = '';
+  $('p-deudor-seleccionado').style.display = 'none';
+  $('p-deudor-buscar').style.display = 'block';
+  $('p-deudor-buscar').value = '';
+  $('btn-toggle-deudor').style.display = 'inline-flex';
+}
+
+function toggleNuevoDeudorInline() {
+  const form = $('p-nuevo-deudor-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  $('p-deudor-lista').style.display = 'none';
+}
+
+async function crearDeudorInline() {
+  const nombre = $('nd-nombre').value.trim();
+  if (!nombre) return toast('El nombre es requerido', 'error');
+  const r = await apiPost({
+    accion: 'deudor_crear',
+    nombre_completo: nombre,
+    dni_cuit: $('nd-dni').value,
+    telefono: $('nd-tel').value,
+    cbu_cuenta: $('nd-cbu').value,
+    referente: $('nd-referente').value,
+    etiquetas: 'Primera vez',
+    tiene_garante: 'No',
+  });
+  if (r.ok) {
+    deudoresCache.push({ id_deudor: r.id_deudor, nombre_completo: nombre, dni_cuit: $('nd-dni').value });
+    seleccionarDeudor(r.id_deudor, nombre);
+    toast('Deudor creado y seleccionado', 'ok');
+    $('p-nuevo-deudor-form').style.display = 'none';
+  } else toast(r.error || 'Error al crear deudor', 'error');
+}
+
+// ── PAGOS ──
+async function cargarPagos() {
+  $('tabla-pagos').innerHTML = '<div class="vacio"><p>Cargando pagos...</p></div>';
+  const r = await api('pagos_listar');
+  if (!r.ok) return;
+  if (!r.pagos.length) {
+    $('tabla-pagos').innerHTML = '<div class="vacio"><p>Sin pagos registrados todavía.</p></div>';
+    return;
+  }
+  let html = '<table><thead><tr><th>ID</th><th>Préstamo</th><th>Fecha</th><th>Monto</th><th>Moneda</th><th>TC</th><th>Canal</th><th>Tipo</th></tr></thead><tbody>';
+  r.pagos.forEach(p => {
+    html += `<tr>
+      <td>${p.id_pago}</td>
+      <td>${p.id_prestamo}</td>
+      <td>${fmtFecha(p.fecha_pago)}</td>
+      <td><strong>$${fmt(p.monto_pagado)}</strong></td>
+      <td><span class="badge badge-${p.moneda_pago==='USD'?'verde':'azul'}">${p.moneda_pago}</span></td>
+      <td>${p.tc_aplicado > 1 ? '$'+fmt(p.tc_aplicado) : '—'}</td>
+      <td>${p.canal_pago}</td>
+      <td><span class="badge badge-${p.pago_parcial_total==='Total'?'verde':'amarillo'}">${p.pago_parcial_total}</span></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  $('tabla-pagos').innerHTML = html;
+}
+
+// ── REPORTES ──
+async function cargarReportes() {
+  $('reporte-content').innerHTML = '<div class="vacio"><p>Cargando reportes...</p></div>';
+  const r = await api('reporte_mensual');
+  if (!r.ok) return;
+  const ma = r.reporte.mes_actual;
+  const mp = r.reporte.mes_anterior;
+  const hoy = new Date();
+  const mesPrev = new Date(hoy.getFullYear(), hoy.getMonth() - 1);
+
+  const renderCard = (titulo, datos) => `
+    <div class="reporte-card">
+      <h4>${titulo}</h4>
+      <div class="reporte-fila"><span>Nuevos préstamos</span><span>${datos.nuevos_prestamos}</span></div>
+      <div class="reporte-fila"><span>Capital desembolsado</span><span>$${fmt(datos.capital_desembolsado)}</span></div>
+      <div class="reporte-fila"><span>Cobros realizados</span><span>$${fmt(datos.cobros)}</span></div>
+      <div class="reporte-fila"><span>Préstamos cancelados</span><span>${datos.prestamos_cancelados}</span></div>
+    </div>`;
+
+  $('reporte-content').innerHTML =
+    renderCard(hoy.toLocaleString('es-AR',{month:'long',year:'numeric'}), ma) +
+    renderCard(mesPrev.toLocaleString('es-AR',{month:'long',year:'numeric'}), mp);
+}
+
+// ── CONFIG ──
+async function cargarConfig() {
+  const r = await api('config_obtener');
+  if (!r.ok) return;
+  const c = r.config;
+  $('cfg-oficial').value = c.tc_oficial ? '$'+fmt(c.tc_oficial) : '—';
+  $('cfg-blue').value = c.tc_blue ? '$'+fmt(c.tc_blue) : '—';
+  $('cfg-mep').value = c.tc_mep ? '$'+fmt(c.tc_mep) : '—';
+  $('cfg-tc-fecha').textContent = c.ultima_actualizacion_tc ? 'Actualizado: '+fmtFecha(c.ultima_actualizacion_tc) : '';
+  $('cfg-tasa').value = c.tasa_interes_default || '';
+  if ($('cfg-moneda')) $('cfg-moneda').value = c.moneda_default || 'ARS';
+  if ($('cfg-mora')) $('cfg-mora').value = c.tipo_mora_default || 'Mensual';
+  $('cfg-valor-mora').value = c.valor_mora_default || '';
+  $('cfg-umbral-bueno').value = c.dias_umbral_bueno || 7;
+  $('cfg-umbral-regular').value = c.dias_umbral_regular || 30;
+  $('cfg-umbral-moroso').value = c.dias_umbral_moroso || 31;
+}
+
+async function guardarConfig() {
+  setLoading('btn-guardar-cfg', true, 'Guardar parámetros');
+  const params = [
+    ['tasa_interes_default', $('cfg-tasa').value],
+    ['moneda_default', $('cfg-moneda').value],
+    ['tipo_mora_default', $('cfg-mora').value],
+    ['valor_mora_default', $('cfg-valor-mora').value],
+  ];
+  for (const [parametro, valor] of params) {
+    await apiPost({ accion:'config_actualizar', parametro, valor });
+  }
+  setLoading('btn-guardar-cfg', false, 'Guardar parámetros');
+  toast('Parámetros guardados', 'ok');
+}
+
+async function guardarUmbrales() {
+  setLoading('btn-guardar-umbr', true, 'Guardar umbrales');
+  const params = [
+    ['dias_umbral_bueno', $('cfg-umbral-bueno').value],
+    ['dias_umbral_regular', $('cfg-umbral-regular').value],
+    ['dias_umbral_moroso', $('cfg-umbral-moroso').value],
+  ];
+  for (const [parametro, valor] of params) {
+    await apiPost({ accion:'config_actualizar', parametro, valor });
+  }
+  setLoading('btn-guardar-umbr', false, 'Guardar umbrales');
+  toast('Umbrales guardados', 'ok');
+}
+
+// ── MODALES ──
+function cerrarModal(id) { $(id).style.display = 'none'; }
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal-overlay')) e.target.style.display = 'none';
+});
+
+async function abrirModalPrestamo(desdeCalc) {
+  // Cargar deudores en cache si hace falta
+  if (!deudoresCache.length) {
+    const r = await api('deudores_listar');
+    deudoresCache = r.ok ? r.deudores : [];
+  }
+  // Resetear selector de deudor
+  $('p-deudor-buscar').value = '';
+  $('p-deudor-buscar').style.display = 'block';
+  $('p-deudor-lista').style.display = 'none';
+  $('p-deudor-seleccionado').style.display = 'none';
+  $('p-deudor-id').value = '';
+  $('p-nuevo-deudor-form').style.display = 'none';
+  $('btn-toggle-deudor').style.display = 'inline-flex';
+
+  if (desdeCalc && simulacionActual) {
+    const rawMonto = simulacionActual.monto || '';
+    $('p-monto').value = rawMonto ? '$' + Number(rawMonto).toLocaleString('es-AR') : '';
+    $('p-monto').dataset.raw = rawMonto;
+    $('p-moneda').value = simulacionActual.moneda || 'ARS';
+    $('p-cuotas').value = simulacionActual.cantidad_cuotas || 12;
+    $('p-tasa').value = simulacionActual.tasa || '';
+    $('p-unidad-tasa').value = simulacionActual.unidad_tasa || 'Mensual';
+    $('p-tipo-tasa').value = simulacionActual.tipo_tasa || 'Compuesta';
+    $('p-gracia').value = simulacionActual.periodo_gracia || 0;
+    $('p-tipo-dev').value = simulacionActual.tipo_devolucion || 'Cuotas fijas';
+  } else {
+    $('p-monto').value = '';
+    $('p-monto').dataset.raw = '';
+    $('p-tasa').value = '';
+  }
+  const hoy = new Date().toISOString().split('T')[0];
+  $('p-fecha-desembolso').value = hoy;
+  $('modal-prestamo').style.display = 'flex';
+}
+
+function toggleCamposCuotas() {
+  $('p-campo-cuotas').style.display = $('p-tipo-dev').value === 'Cuota única' ? 'none' : 'block';
+}
+
+async function crearPrestamo() {
+  if (!$('p-deudor-id').value) return toast('Seleccioná o creá un deudor', 'error');
+  if (!getRawMonto('p-monto')) return toast('Ingresá el monto', 'error');
+
+  setLoading('btn-crear-prestamo', true, 'Crear préstamo');
+  const body = {
+    accion: 'prestamo_crear',
+    id_deudor: $('p-deudor-id').value,
+    monto_capital: getRawMonto('p-monto'),
+    moneda: $('p-moneda').value,
+    fecha_desembolso: $('p-fecha-desembolso').value,
+    fecha_primera_cuota: $('p-fecha-cuota').value,
+    tipo_devolucion: $('p-tipo-dev').value,
+    cantidad_cuotas: $('p-cuotas').value,
+    tasa_interes: $('p-tasa').value,
+    unidad_tasa: $('p-unidad-tasa').value,
+    tipo_tasa: $('p-tipo-tasa').value,
+    periodo_gracia_dias: $('p-gracia').value,
+    tipo_mora: $('p-tipo-mora').value,
+    valor_mora: $('p-valor-mora').value,
+    pago_anticipado: $('p-pago-anticipado').value,
+    imputacion_parcial: $('p-imputacion').value,
+    renovable: $('p-renovable').value,
+    forma_entrega: $('p-forma').value,
+    notas_internas: $('p-notas').value,
+  };
+  const r = await apiPost(body);
+  setLoading('btn-crear-prestamo', false, 'Crear préstamo');
+  if (r.ok) {
+    cerrarModal('modal-prestamo');
+    toast('Préstamo ' + r.id_prestamo + ' creado', 'ok');
+    cargarPrestamos();
+  } else toast(r.error || 'Error al crear préstamo', 'error');
+}
+
+function abrirModalDeudor() { $('modal-deudor').style.display = 'flex'; }
+
+function toggleGarante() {
+  $('seccion-garante').style.display = $('d-tiene-garante').value === 'Sí' ? 'block' : 'none';
+}
+
+async function crearDeudor() {
+  setLoading('btn-crear-deudor', true, 'Guardar deudor');
+  const body = {
+    accion: 'deudor_crear',
+    nombre_completo: $('d-nombre').value,
+    dni_cuit: $('d-dni').value,
+    telefono: $('d-tel').value,
+    email: $('d-email').value,
+    cbu_cuenta: $('d-cbu').value,
+    direccion: $('d-direccion').value,
+    referente: $('d-referente').value,
+    etiquetas: $('d-etiqueta').value,
+    tiene_garante: $('d-tiene-garante').value,
+    garante_nombre: $('g-nombre').value,
+    garante_dni: $('g-dni').value,
+    garante_telefono: $('g-tel').value,
+    garante_relacion: $('g-relacion').value,
+    notas: $('d-notas').value,
+  };
+  const r = await apiPost(body);
+  setLoading('btn-crear-deudor', false, 'Guardar deudor');
+  if (r.ok) {
+    deudoresCache.push({ id_deudor: r.id_deudor, nombre_completo: body.nombre_completo, dni_cuit: body.dni_cuit });
+    cerrarModal('modal-deudor');
+    toast('Deudor ' + r.id_deudor + ' creado', 'ok');
+    cargarDeudores();
+  } else toast(r.error || 'Error al crear deudor', 'error');
+}
+
+async function abrirModalPago(idPrestamo) {
+  $('modal-pago').style.display = 'flex';
+  const rP = await api('prestamos_listar');
+  const sel = $('pago-prestamo');
+  sel.innerHTML = '';
+  if (rP.ok) rP.prestamos.filter(p=>['Vigente','Al día','En mora'].includes(p.estado)).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id_prestamo;
+    opt.textContent = p.id_prestamo + ' — $' + fmt(p.monto_capital);
+    if (idPrestamo && p.id_prestamo === idPrestamo) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  $('pago-fecha').value = new Date().toISOString().split('T')[0];
+  if (idPrestamo) cargarCuotasSelect();
+}
+
+async function cargarCuotasSelect() {
+  const id = $('pago-prestamo').value;
+  const r = await api('cuotas_prestamo', { id_prestamo: id });
+  const sel = $('pago-cuota');
+  sel.innerHTML = '<option value="">Sin cuota específica</option>';
+  if (r.ok) r.cuotas.filter(c=>c.estado!=='Pagada'&&c.estado!=='Refinanciada').forEach(c => {
+    sel.innerHTML += `<option value="${c.id_cuota}">#${c.numero_cuota} — ${fmtFecha(c.fecha_vencimiento)} — $${fmt(c.monto_total)}</option>`;
+  });
+}
+
+async function registrarPago() {
+  setLoading('btn-registrar-pago', true, 'Registrar pago');
+  const body = {
+    accion: 'pago_registrar',
+    id_prestamo: $('pago-prestamo').value,
+    id_cuota: $('pago-cuota').value,
+    monto_pagado: getRawMonto('pago-monto'),
+    moneda_pago: $('pago-moneda').value,
+    tipo_imputacion: $('pago-imputacion').value,
+    pago_parcial_total: $('pago-tipo').value,
+    canal_pago: $('pago-canal').value,
+    fecha_pago: $('pago-fecha').value,
+    comprobante: $('pago-comprobante').value,
+    notas: $('pago-notas').value,
+  };
+  const r = await apiPost(body);
+  setLoading('btn-registrar-pago', false, 'Registrar pago');
+  if (r.ok) {
+    cerrarModal('modal-pago');
+    toast('Pago ' + r.id_pago + ' registrado', 'ok');
+    cargarPagos();
+  } else toast(r.error || 'Error al registrar pago', 'error');
+}
+
+// ── INICIO ──
+iniciarApp();
+</script>
 
 // ── UTILIDADES ──
 const $ = id => document.getElementById(id);
