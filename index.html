@@ -794,14 +794,30 @@ async function api(accion, params = {}) {
   url.searchParams.set('accion', accion);
   if (TOKEN) url.searchParams.set('token', TOKEN);
   Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
-  const r = await fetch(url.toString());
-  return r.json();
+  try {
+    const r = await fetch(url.toString(), { redirect: 'follow' });
+    const text = await r.text();
+    return JSON.parse(text);
+  } catch (err) {
+    console.error('api error:', err);
+    return { ok: false, error: err.message };
+  }
 }
 
 async function apiPost(body) {
   if (TOKEN) body.token = TOKEN;
-  const r = await fetch(API, { method:'POST', body: JSON.stringify(body) });
-  return r.json();
+  try {
+    const r = await fetch(API, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      redirect: 'follow',
+    });
+    const text = await r.text();
+    return JSON.parse(text);
+  } catch (err) {
+    console.error('apiPost error:', err);
+    return { ok: false, error: err.message };
+  }
 }
 
 function badgeEstado(estado) {
@@ -1359,43 +1375,55 @@ async function guardarConfig() {
   const btn = $('btn-guardar-cfg');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Guardando...';
-  const params = [
-    ['tasa_interes_default', $('cfg-tasa').value],
-    ['moneda_default', $('cfg-moneda').value],
-    ['tipo_mora_default', $('cfg-mora').value],
-    ['valor_mora_default', $('cfg-valor-mora').value],
-  ];
-  for (const [parametro, valor] of params) {
-    await apiPost({ accion:'config_actualizar', parametro, valor });
-  }
-  btn.disabled = false;
-  btn.innerHTML = '✓ Guardado';
-  btn.classList.add('btn-guardado');
-  setTimeout(() => {
+  try {
+    const params = [
+      ['tasa_interes_default', $('cfg-tasa').value],
+      ['moneda_default', $('cfg-moneda').value],
+      ['tipo_mora_default', $('cfg-mora').value],
+      ['valor_mora_default', $('cfg-valor-mora').value],
+    ];
+    for (const [parametro, valor] of params) {
+      await apiPost({ accion:'config_actualizar', parametro, valor });
+    }
+    btn.innerHTML = '✓ Guardado';
+    btn.classList.add('btn-guardado');
+    setTimeout(() => {
+      btn.innerHTML = 'Guardar parámetros';
+      btn.classList.remove('btn-guardado');
+    }, 3000);
+  } catch (err) {
+    toast('Error al guardar: ' + err.message, 'error');
     btn.innerHTML = 'Guardar parámetros';
-    btn.classList.remove('btn-guardado');
-  }, 3000);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function guardarUmbrales() {
   const btn = $('btn-guardar-umbr');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Guardando...';
-  const params = [
-    ['dias_umbral_bueno', $('cfg-umbral-bueno').value],
-    ['dias_umbral_regular', $('cfg-umbral-regular').value],
-    ['dias_umbral_moroso', $('cfg-umbral-moroso').value],
-  ];
-  for (const [parametro, valor] of params) {
-    await apiPost({ accion:'config_actualizar', parametro, valor });
-  }
-  btn.disabled = false;
-  btn.innerHTML = '✓ Guardado';
-  btn.classList.add('btn-guardado');
-  setTimeout(() => {
+  try {
+    const params = [
+      ['dias_umbral_bueno', $('cfg-umbral-bueno').value],
+      ['dias_umbral_regular', $('cfg-umbral-regular').value],
+      ['dias_umbral_moroso', $('cfg-umbral-moroso').value],
+    ];
+    for (const [parametro, valor] of params) {
+      await apiPost({ accion:'config_actualizar', parametro, valor });
+    }
+    btn.innerHTML = '✓ Guardado';
+    btn.classList.add('btn-guardado');
+    setTimeout(() => {
+      btn.innerHTML = 'Guardar umbrales';
+      btn.classList.remove('btn-guardado');
+    }, 3000);
+  } catch (err) {
+    toast('Error al guardar: ' + err.message, 'error');
     btn.innerHTML = 'Guardar umbrales';
-    btn.classList.remove('btn-guardado');
-  }, 3000);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ── MODALES ──
@@ -1565,566 +1593,6 @@ async function registrarPago() {
 
 // ── INICIO ──
 iniciarApp();
-</script>
-
-// ── UTILIDADES ──
-const $ = id => document.getElementById(id);
-const fmt = n => isNaN(n) ? '—' : Number(n).toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:0});
-const fmtDec = n => isNaN(n) ? '—' : Number(n).toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
-const fmtFecha = s => s ? s.split('T')[0].split('-').reverse().join('/') : '—';
-
-function toast(msg, tipo = '') {
-  const t = $('toast');
-  t.textContent = msg; t.className = 'show ' + tipo;
-  setTimeout(() => t.className = '', 2800);
-}
-
-async function api(accion, params = {}) {
-  const url = new URL(API);
-  url.searchParams.set('accion', accion);
-  if (TOKEN) url.searchParams.set('token', TOKEN);
-  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
-  const r = await fetch(url.toString());
-  return r.json();
-}
-
-async function apiPost(body) {
-  if (TOKEN) body.token = TOKEN;
-  const r = await fetch(API, { method:'POST', body: JSON.stringify(body) });
-  return r.json();
-}
-
-function badgeEstado(estado) {
-  const mapa = {
-    'Vigente': 'badge-azul', 'Al día': 'badge-verde', 'En mora': 'badge-rojo',
-    'Cancelado': 'badge-gris', 'Condonado': 'badge-amarillo', 'Refinanciado': 'badge-violeta'
-  };
-  return `<span class="badge ${mapa[estado] || 'badge-gris'}">${estado}</span>`;
-}
-
-function badgeCalif(c) {
-  const mapa = { 'Excelente':'badge-verde','Bueno':'badge-azul','Regular':'badge-amarillo','Moroso':'badge-rojo','Sin historial':'badge-gris' };
-  return `<span class="badge ${mapa[c] || 'badge-gris'}">${c}</span>`;
-}
-
-// ── LOGIN ──
-async function hacerLogin() {
-  const usuario = $('login-usuario').value.trim();
-  const pass = $('login-pass').value.trim();
-  if (!usuario || !pass) return;
-  const btn = $('btn-login');
-  btn.innerHTML = '<span class="spinner"></span>';
-  btn.disabled = true;
-
-  const r = await apiPost({ accion:'login', usuario, contrasena: pass });
-
-  if (r.ok) {
-    TOKEN = r.token;
-    USER_ROL = r.rol;
-    $('pantalla-login').style.display = 'none';
-    $('app').style.display = 'flex';
-    $('sidebar-usuario').textContent = r.usuario;
-    $('topbar-rol').textContent = r.rol;
-    irA('calculadora');
-    cargarTC();
-  } else {
-    $('login-error').style.display = 'block';
-    btn.innerHTML = 'Ingresar';
-    btn.disabled = false;
-  }
-}
-
-$('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') hacerLogin(); });
-
-function cerrarSesion() {
-  TOKEN = null;
-  $('app').style.display = 'none';
-  $('pantalla-login').style.display = 'flex';
-  $('login-usuario').value = '';
-  $('login-pass').value = '';
-  $('login-error').style.display = 'none';
-}
-
-// ── NAVEGACIÓN ──
-function irA(vista) {
-  document.querySelectorAll('.vista').forEach(v => v.style.display = 'none');
-  document.querySelectorAll('nav a').forEach(a => a.classList.remove('activo'));
-  const titulos = {
-    calculadora:'Simulador', dashboard:'Dashboard', prestamos:'Préstamos',
-    'detalle-prestamo':'Detalle de préstamo', deudores:'Deudores',
-    pagos:'Pagos', reportes:'Reportes', configuracion:'Configuración'
-  };
-  const el = $('vista-' + vista);
-  if (el) el.style.display = 'block';
-  $('topbar-titulo').textContent = titulos[vista] || vista;
-  const nav = $('nav-' + vista);
-  if (nav) nav.classList.add('activo');
-
-  if (vista === 'dashboard')      cargarDashboard();
-  if (vista === 'prestamos')      cargarPrestamos();
-  if (vista === 'deudores')       cargarDeudores();
-  if (vista === 'pagos')          cargarPagos();
-  if (vista === 'reportes')       cargarReportes();
-  if (vista === 'configuracion')  cargarConfig();
-}
-
-// ── TC ──
-async function cargarTC() {
-  const r = await api('tc');
-  if (r.ok) {
-    $('tc-blue-sidebar').textContent = '$' + fmt(r.tc.blue);
-    $('tc-oficial-sidebar').textContent = '$' + fmt(r.tc.oficial);
-  }
-}
-
-async function actualizarTC() {
-  const r = await api('tc_actualizar');
-  if (r.ok) {
-    toast('TC actualizado correctamente', 'ok');
-    cargarConfig();
-    cargarTC();
-  } else toast('Error al actualizar TC', 'error');
-}
-
-// ── CALCULADORA ──
-function toggleCuotas() {
-  $('campo-cuotas').style.display = $('calc-tipo').value === 'Cuota única' ? 'none' : 'block';
-}
-
-function limpiarCalc() { $('calc-resultado').style.display = 'none'; }
-
-async function simular() {
-  const monto = parseFloat($('calc-monto').value);
-  const tasa = parseFloat($('calc-tasa').value);
-  if (!monto || !tasa) return toast('Completá monto y tasa', 'error');
-
-  const body = {
-    accion: 'simular', monto, moneda: $('calc-moneda').value,
-    tipo_devolucion: $('calc-tipo').value,
-    cantidad_cuotas: parseInt($('calc-cuotas').value) || 1,
-    tasa, unidad_tasa: $('calc-unidad').value,
-    tipo_tasa: $('calc-tipo-tasa').value,
-    periodo_gracia: parseInt($('calc-gracia').value) || 0,
-  };
-
-  const r = await apiPost(body);
-  if (!r.ok) return toast('Error en simulación', 'error');
-
-  simulacionActual = { ...body, ...r.simulacion };
-  const s = r.simulacion;
-  const moneda = body.moneda === 'USD' ? 'USD ' : '$';
-
-  $('r-total').textContent = moneda + fmtDec(s.total_pagar);
-  $('r-interes').textContent = moneda + fmtDec(s.total_interes);
-  $('r-cuota').textContent = s.cuota_mensual > 0 ? moneda + fmtDec(s.cuota_mensual) : '—';
-  $('r-tasas').textContent = s.tna.toFixed(2) + '% / ' + s.tea.toFixed(2) + '%';
-
-  if (s.cronograma.length > 0 && s.cronograma.length <= 24) {
-    let html = '<div class="cronograma-mini"><table><thead><tr><th>#</th><th>Capital</th><th>Interés</th><th>Total</th></tr></thead><tbody>';
-    s.cronograma.forEach(c => {
-      html += `<tr><td>${c.cuota}</td><td>${moneda}${fmtDec(c.capital)}</td><td>${moneda}${fmtDec(c.interes)}</td><td><strong>${moneda}${fmtDec(c.total)}</strong></td></tr>`;
-    });
-    html += '</tbody></table></div>';
-    $('cronograma-mini').innerHTML = html;
-  }
-  $('calc-resultado').style.display = 'block';
-}
-
-// ── DASHBOARD ──
-async function cargarDashboard() {
-  const r = await api('reporte_dashboard');
-  if (!r.ok) return;
-  const d = r.dashboard;
-  $('d-capital').textContent = '$' + fmt(d.capital_activo);
-  $('d-mora').textContent = d.en_mora;
-  $('d-cobros').textContent = '$' + fmt(d.cobros_mes);
-  $('d-activos').textContent = d.prestamos_activos;
-  $('d-monedas').textContent = `ARS: ${d.distribucion_moneda.ARS} · USD: ${d.distribucion_moneda.USD}`;
-
-  const hoy = new Date();
-  $('d-cobros-sub').textContent = hoy.toLocaleString('es-AR', {month:'long', year:'numeric'});
-
-  const rPag = await api('pagos_listar');
-  if (rPag.ok && rPag.pagos.length > 0) {
-    const ultimos = rPag.pagos.slice(-5).reverse();
-    let html = '<table><thead><tr><th>ID</th><th>Préstamo</th><th>Fecha</th><th>Monto</th><th>Canal</th></tr></thead><tbody>';
-    ultimos.forEach(p => {
-      html += `<tr><td>${p.id_pago}</td><td>${p.id_prestamo}</td><td>${fmtFecha(p.fecha_pago)}</td><td>$${fmt(p.monto_pagado)}</td><td>${p.canal_pago}</td></tr>`;
-    });
-    html += '</tbody></table>';
-    $('d-movimientos').innerHTML = html;
-  } else {
-    $('d-movimientos').innerHTML = '<div class="vacio"><p>Sin movimientos aún. Registrá el primer pago.</p></div>';
-  }
-}
-
-// ── PRÉSTAMOS ──
-async function cargarPrestamos() {
-  const estado = $('filtro-estado').value;
-  const params = estado ? { estado } : {};
-  const r = await api('prestamos_listar', params);
-  if (!r.ok) return;
-
-  if (!r.prestamos.length) {
-    $('tabla-prestamos').innerHTML = '<div class="vacio"><p>No hay préstamos. Usá la calculadora para crear el primero.</p></div>';
-    return;
-  }
-
-  let html = '<table><thead><tr><th>ID</th><th>Deudor</th><th>Capital</th><th>Moneda</th><th>Tipo</th><th>Estado</th><th>Vencimiento</th><th>Etiqueta</th><th></th></tr></thead><tbody>';
-  r.prestamos.forEach(p => {
-    html += `<tr>
-      <td><strong>${p.id_prestamo}</strong></td>
-      <td>${p.id_deudor}</td>
-      <td>$${fmt(p.monto_capital)}</td>
-      <td><span class="badge badge-${p.moneda === 'USD' ? 'verde' : 'azul'}">${p.moneda}</span></td>
-      <td>${p.tipo_devolucion}</td>
-      <td>${badgeEstado(p.estado)}</td>
-      <td>${fmtFecha(p.fecha_vencimiento)}</td>
-      <td>${p.etiquetas ? `<span class="badge badge-gris">${p.etiquetas}</span>` : ''}</td>
-      <td><button class="btn btn-secundario btn-sm" onclick="verDetallePrestamo('${p.id_prestamo}')">Ver</button></td>
-    </tr>`;
-  });
-  html += '</tbody></table>';
-  $('tabla-prestamos').innerHTML = html;
-}
-
-async function verDetallePrestamo(id) {
-  irA('detalle-prestamo');
-  $('detalle-prestamo-content').innerHTML = '<div class="vacio"><p>Cargando...</p></div>';
-  const r = await api('prestamo_obtener', { id });
-  if (!r.ok) return;
-  const p = r.prestamo;
-  const res = r.resumen;
-  const pct = res.capital_original > 0 ? Math.round((res.total_pagado / res.capital_original) * 100) : 0;
-
-  let html = `
-    <div class="detalle-resumen">
-      <div class="detalle-item">
-        <div class="detalle-label">Capital original</div>
-        <div class="detalle-valor">$${fmt(res.capital_original)}</div>
-        <div style="font-size:11px;color:var(--gris-texto);margin-top:2px">${p.moneda} · ${p.tipo_devolucion}</div>
-      </div>
-      <div class="detalle-item">
-        <div class="detalle-label">Total pagado</div>
-        <div class="detalle-valor" style="color:var(--verde)">$${fmt(res.total_pagado)}</div>
-        <div style="font-size:11px;color:var(--gris-texto);margin-top:2px">${pct}% del capital</div>
-      </div>
-      <div class="detalle-item">
-        <div class="detalle-label">Saldo pendiente</div>
-        <div class="detalle-valor" style="color:var(--azul-oscuro)">$${fmt(res.saldo_pendiente)}</div>
-        <div style="font-size:11px;margin-top:2px">${badgeEstado(p.estado)}</div>
-      </div>
-    </div>
-    <div class="tabla-wrap" style="padding:16px 20px;margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span style="font-size:13px;font-weight:600;color:var(--azul-oscuro)">Progreso de pago</span>
-        <span style="font-size:12px;color:var(--gris-texto)">${pct}% · ${r.cuotas.filter(c=>c.estado==='Pagada').length} de ${r.cuotas.length} cuotas</span>
-      </div>
-      <div class="progreso-barra"><div class="progreso-fill" style="width:${pct}%"></div></div>
-    </div>`;
-
-  // Cronograma visual
-  if (r.cuotas.length > 0) {
-    const hoy = new Date();
-    html += `<div class="tabla-wrap" style="padding:16px 20px;margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h3 style="font-size:14px;font-weight:600;color:var(--azul-oscuro)">Cronograma de cuotas</h3>
-        <button class="btn btn-primario btn-sm" onclick="abrirModalPago('${p.id_prestamo}')">+ Registrar pago</button>
-      </div>
-      <div class="cuotas-lista">`;
-
-    r.cuotas.forEach(c => {
-      const vence = new Date(c.fecha_vencimiento);
-      const diasHasta = Math.floor((vence - hoy) / 86400000);
-      let clase = '';
-      let estadoBadge = '';
-
-      if (c.estado === 'Pagada') { clase = 'pagada'; estadoBadge = '<span class="badge badge-verde">Pagada</span>'; }
-      else if (c.estado === 'Vencida' || c.estado_propuesto === 'Vencida') { clase = 'vencida'; estadoBadge = '<span class="badge badge-rojo">Vencida</span>'; }
-      else if (c.estado === 'Refinanciada') { clase = 'refinanciada'; estadoBadge = '<span class="badge badge-violeta">Refinanciada</span>'; }
-      else if (diasHasta <= 7 && diasHasta >= 0) { clase = 'proxima'; estadoBadge = '<span class="badge badge-amarillo">Próxima</span>'; }
-      else { estadoBadge = '<span class="badge badge-gris">Pendiente</span>'; }
-
-      html += `<div class="cuota-item ${clase}">
-        <div class="cuota-num">#${c.numero_cuota}</div>
-        <div class="cuota-fecha">${fmtFecha(c.fecha_vencimiento)}</div>
-        <div class="cuota-monto">$${fmt(c.monto_total)}</div>
-        <div>${estadoBadge}</div>
-      </div>`;
-    });
-    html += '</div></div>';
-  }
-
-  // Historial de pagos
-  if (r.pagos.length > 0) {
-    html += `<div class="tabla-wrap"><div class="tabla-header"><h3>Historial de pagos</h3></div>
-      <table><thead><tr><th>ID</th><th>Fecha</th><th>Monto</th><th>Moneda</th><th>Canal</th><th>Comprobante</th></tr></thead><tbody>`;
-    r.pagos.forEach(pg => {
-      html += `<tr><td>${pg.id_pago}</td><td>${fmtFecha(pg.fecha_pago)}</td><td>$${fmt(pg.monto_pagado)}</td><td>${pg.moneda_pago}</td><td>${pg.canal_pago}</td><td>${pg.comprobante || '—'}</td></tr>`;
-    });
-    html += '</tbody></table></div>';
-  }
-
-  $('detalle-prestamo-content').innerHTML = html;
-}
-
-// ── DEUDORES ──
-async function cargarDeudores() {
-  const r = await api('deudores_listar');
-  if (!r.ok) return;
-  if (!r.deudores.length) {
-    $('tabla-deudores').innerHTML = '<div class="vacio"><p>Sin deudores registrados todavía.</p></div>';
-    return;
-  }
-  let html = '<table><thead><tr><th>ID</th><th>Nombre</th><th>DNI/CUIT</th><th>Teléfono</th><th>Calificación</th><th>Etiqueta</th><th>Garante</th></tr></thead><tbody>';
-  r.deudores.forEach(d => {
-    html += `<tr>
-      <td>${d.id_deudor}</td>
-      <td><strong>${d.nombre_completo}</strong></td>
-      <td>${d.dni_cuit}</td>
-      <td>${d.telefono}</td>
-      <td>${badgeCalif(d.calificacion)}</td>
-      <td>${d.etiquetas ? `<span class="badge badge-gris">${d.etiquetas}</span>` : ''}</td>
-      <td>${d.tiene_garante === 'Sí' ? '<span class="badge badge-azul">Sí</span>' : '—'}</td>
-    </tr>`;
-  });
-  html += '</tbody></table>';
-  $('tabla-deudores').innerHTML = html;
-}
-
-// ── PAGOS ──
-async function cargarPagos() {
-  const r = await api('pagos_listar');
-  if (!r.ok) return;
-  if (!r.pagos.length) {
-    $('tabla-pagos').innerHTML = '<div class="vacio"><p>Sin pagos registrados todavía.</p></div>';
-    return;
-  }
-  let html = '<table><thead><tr><th>ID</th><th>Préstamo</th><th>Fecha</th><th>Monto</th><th>Moneda</th><th>TC</th><th>Canal</th><th>Tipo</th></tr></thead><tbody>';
-  r.pagos.forEach(p => {
-    html += `<tr>
-      <td>${p.id_pago}</td>
-      <td>${p.id_prestamo}</td>
-      <td>${fmtFecha(p.fecha_pago)}</td>
-      <td><strong>$${fmt(p.monto_pagado)}</strong></td>
-      <td><span class="badge badge-${p.moneda_pago==='USD'?'verde':'azul'}">${p.moneda_pago}</span></td>
-      <td>${p.tc_aplicado > 1 ? '$'+fmt(p.tc_aplicado) : '—'}</td>
-      <td>${p.canal_pago}</td>
-      <td><span class="badge badge-${p.pago_parcial_total==='Total'?'verde':'amarillo'}">${p.pago_parcial_total}</span></td>
-    </tr>`;
-  });
-  html += '</tbody></table>';
-  $('tabla-pagos').innerHTML = html;
-}
-
-// ── REPORTES ──
-async function cargarReportes() {
-  const r = await api('reporte_mensual');
-  if (!r.ok) return;
-  const ma = r.reporte.mes_actual;
-  const mp = r.reporte.mes_anterior;
-  const hoy = new Date();
-  const mesPrev = new Date(hoy.getFullYear(), hoy.getMonth() - 1);
-
-  const renderCard = (titulo, datos) => `
-    <div class="reporte-card">
-      <h4>${titulo}</h4>
-      <div class="reporte-fila"><span>Nuevos préstamos</span><span>${datos.nuevos_prestamos}</span></div>
-      <div class="reporte-fila"><span>Capital desembolsado</span><span>$${fmt(datos.capital_desembolsado)}</span></div>
-      <div class="reporte-fila"><span>Cobros realizados</span><span>$${fmt(datos.cobros)}</span></div>
-      <div class="reporte-fila"><span>Préstamos cancelados</span><span>${datos.prestamos_cancelados}</span></div>
-    </div>`;
-
-  $('reporte-content').innerHTML =
-    renderCard(hoy.toLocaleString('es-AR',{month:'long',year:'numeric'}), ma) +
-    renderCard(mesPrev.toLocaleString('es-AR',{month:'long',year:'numeric'}), mp);
-}
-
-// ── CONFIG ──
-async function cargarConfig() {
-  const r = await api('config_obtener');
-  if (!r.ok) return;
-  const c = r.config;
-  $('cfg-oficial').value = c.tc_oficial ? '$'+fmt(c.tc_oficial) : '—';
-  $('cfg-blue').value = c.tc_blue ? '$'+fmt(c.tc_blue) : '—';
-  $('cfg-mep').value = c.tc_mep ? '$'+fmt(c.tc_mep) : '—';
-  $('cfg-tc-fecha').textContent = c.ultima_actualizacion_tc ? 'Actualizado: '+fmtFecha(c.ultima_actualizacion_tc) : '';
-  $('cfg-tasa').value = c.tasa_interes_default || '';
-  if ($('cfg-moneda')) $('cfg-moneda').value = c.moneda_default || 'ARS';
-  if ($('cfg-mora')) $('cfg-mora').value = c.tipo_mora_default || 'Mensual';
-  $('cfg-valor-mora').value = c.valor_mora_default || '';
-  $('cfg-umbral-bueno').value = c.dias_umbral_bueno || 7;
-  $('cfg-umbral-regular').value = c.dias_umbral_regular || 30;
-  $('cfg-umbral-moroso').value = c.dias_umbral_moroso || 31;
-}
-
-async function guardarConfig() {
-  const params = [
-    ['tasa_interes_default', $('cfg-tasa').value],
-    ['moneda_default', $('cfg-moneda').value],
-    ['tipo_mora_default', $('cfg-mora').value],
-    ['valor_mora_default', $('cfg-valor-mora').value],
-  ];
-  for (const [parametro, valor] of params) {
-    await apiPost({ accion:'config_actualizar', parametro, valor });
-  }
-  toast('Parámetros guardados', 'ok');
-}
-
-async function guardarUmbrales() {
-  const params = [
-    ['dias_umbral_bueno', $('cfg-umbral-bueno').value],
-    ['dias_umbral_regular', $('cfg-umbral-regular').value],
-    ['dias_umbral_moroso', $('cfg-umbral-moroso').value],
-  ];
-  for (const [parametro, valor] of params) {
-    await apiPost({ accion:'config_actualizar', parametro, valor });
-  }
-  toast('Umbrales guardados', 'ok');
-}
-
-// ── MODALES ──
-function cerrarModal(id) { $(id).style.display = 'none'; }
-document.addEventListener('click', e => {
-  if (e.target.classList.contains('modal-overlay')) e.target.style.display = 'none';
-});
-
-async function abrirModalPrestamo(desdeCalc) {
-  const r = await api('deudores_listar');
-  const sel = $('p-deudor');
-  sel.innerHTML = '<option value="">Seleccioná un deudor</option>';
-  if (r.ok) r.deudores.forEach(d => {
-    sel.innerHTML += `<option value="${d.id_deudor}">${d.nombre_completo}</option>`;
-  });
-  if (desdeCalc && simulacionActual) {
-    $('p-monto').value = simulacionActual.monto || '';
-    $('p-moneda').value = simulacionActual.moneda || 'ARS';
-    $('p-cuotas').value = simulacionActual.cantidad_cuotas || 12;
-    $('p-tasa').value = simulacionActual.tasa || '';
-    $('p-unidad-tasa').value = simulacionActual.unidad_tasa || 'Mensual';
-    $('p-tipo-tasa').value = simulacionActual.tipo_tasa || 'Compuesta';
-    $('p-tipo-dev').value = simulacionActual.tipo_devolucion || 'Cuotas fijas';
-  }
-  const hoy = new Date().toISOString().split('T')[0];
-  $('p-fecha-desembolso').value = hoy;
-  $('modal-prestamo').style.display = 'flex';
-}
-
-function toggleCamposCuotas() {
-  $('p-campo-cuotas').style.display = $('p-tipo-dev').value === 'Cuota única' ? 'none' : 'block';
-}
-
-async function crearPrestamo() {
-  const body = {
-    accion: 'prestamo_crear',
-    id_deudor: $('p-deudor').value,
-    monto_capital: $('p-monto').value,
-    moneda: $('p-moneda').value,
-    fecha_desembolso: $('p-fecha-desembolso').value,
-    fecha_primera_cuota: $('p-fecha-cuota').value,
-    tipo_devolucion: $('p-tipo-dev').value,
-    cantidad_cuotas: $('p-cuotas').value,
-    tasa_interes: $('p-tasa').value,
-    unidad_tasa: $('p-unidad-tasa').value,
-    tipo_tasa: $('p-tipo-tasa').value,
-    periodo_gracia_dias: 0,
-    tipo_mora: 'Mensual',
-    valor_mora: 0,
-    pago_anticipado: 'Descuenta interés futuro',
-    imputacion_parcial: 'Operador decide',
-    renovable: 'No',
-    forma_entrega: $('p-forma').value,
-    notas_internas: $('p-notas').value,
-  };
-  const r = await apiPost(body);
-  if (r.ok) {
-    cerrarModal('modal-prestamo');
-    toast('Préstamo ' + r.id_prestamo + ' creado', 'ok');
-    cargarPrestamos();
-  } else toast(r.error || 'Error al crear préstamo', 'error');
-}
-
-function abrirModalDeudor() {
-  $('modal-deudor').style.display = 'flex';
-}
-
-function toggleGarante() {
-  $('seccion-garante').style.display = $('d-tiene-garante').value === 'Sí' ? 'block' : 'none';
-}
-
-async function crearDeudor() {
-  const body = {
-    accion: 'deudor_crear',
-    nombre_completo: $('d-nombre').value,
-    dni_cuit: $('d-dni').value,
-    telefono: $('d-tel').value,
-    email: $('d-email').value,
-    cbu_cuenta: $('d-cbu').value,
-    direccion: $('d-direccion').value,
-    referente: $('d-referente').value,
-    etiquetas: $('d-etiqueta').value,
-    tiene_garante: $('d-tiene-garante').value,
-    garante_nombre: $('g-nombre').value,
-    garante_dni: $('g-dni').value,
-    garante_telefono: $('g-tel').value,
-    garante_relacion: $('g-relacion').value,
-    notas: $('d-notas').value,
-  };
-  const r = await apiPost(body);
-  if (r.ok) {
-    cerrarModal('modal-deudor');
-    toast('Deudor ' + r.id_deudor + ' creado', 'ok');
-    cargarDeudores();
-  } else toast(r.error || 'Error al crear deudor', 'error');
-}
-
-async function abrirModalPago(idPrestamo) {
-  const rP = await api('prestamos_listar');
-  const sel = $('pago-prestamo');
-  sel.innerHTML = '';
-  if (rP.ok) rP.prestamos.filter(p=>['Vigente','Al día','En mora'].includes(p.estado)).forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.id_prestamo;
-    opt.textContent = p.id_prestamo + ' — $' + fmt(p.monto_capital);
-    if (idPrestamo && p.id_prestamo === idPrestamo) opt.selected = true;
-    sel.appendChild(opt);
-  });
-  $('pago-fecha').value = new Date().toISOString().split('T')[0];
-  if (idPrestamo) cargarCuotasSelect();
-  $('modal-pago').style.display = 'flex';
-}
-
-async function cargarCuotasSelect() {
-  const id = $('pago-prestamo').value;
-  const r = await api('cuotas_prestamo', { id_prestamo: id });
-  const sel = $('pago-cuota');
-  sel.innerHTML = '<option value="">Sin cuota específica</option>';
-  if (r.ok) r.cuotas.filter(c=>c.estado!=='Pagada'&&c.estado!=='Refinanciada').forEach(c => {
-    sel.innerHTML += `<option value="${c.id_cuota}">#${c.numero_cuota} — ${fmtFecha(c.fecha_vencimiento)} — $${fmt(c.monto_total)}</option>`;
-  });
-}
-
-async function registrarPago() {
-  const body = {
-    accion: 'pago_registrar',
-    id_prestamo: $('pago-prestamo').value,
-    id_cuota: $('pago-cuota').value,
-    monto_pagado: $('pago-monto').value,
-    moneda_pago: $('pago-moneda').value,
-    tipo_imputacion: $('pago-imputacion').value,
-    pago_parcial_total: $('pago-tipo').value,
-    canal_pago: $('pago-canal').value,
-    fecha_pago: $('pago-fecha').value,
-    comprobante: $('pago-comprobante').value,
-    notas: $('pago-notas').value,
-  };
-  const r = await apiPost(body);
-  if (r.ok) {
-    cerrarModal('modal-pago');
-    toast('Pago ' + r.id_pago + ' registrado', 'ok');
-    cargarPagos();
-  } else toast(r.error || 'Error al registrar pago', 'error');
-}
 </script>
 </body>
 </html>
